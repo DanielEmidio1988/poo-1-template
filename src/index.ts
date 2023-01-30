@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express'
 import cors from 'cors'
 import { TAccountDB, TAccountDBPost, TUserDB, TUserDBPost } from './types'
 import { db } from './database/knex'
+import { User } from './models/User'
+import { Account } from './models/Account'
 
 const app = express()
 
@@ -30,7 +32,15 @@ app.get("/ping", async (req: Request, res: Response) => {
     }
 })
 
+
 app.get("/users", async (req: Request, res: Response) => {
+   
+    // Agora vamos refatorar o código no src/index.ts para
+    // utilizar o modelo implementado de User
+    // Refatore o endpoint GET /users
+    // a resposta deve ser uma lista de instâncias User
+      
+   
     try {
         const q = req.query.q
 
@@ -43,8 +53,34 @@ app.get("/users", async (req: Request, res: Response) => {
             const result: TUserDB[] = await db("users")
             usersDB = result
         }
+        //prática 02: 
+        // Agora vamos refatorar o código no src/index.ts para
+        // utilizar o modelo implementado de User
+        // Refatore o endpoint GET /users
+        // a resposta deve ser uma lista de --->instâncias<--- User
 
-        res.status(200).send(usersDB)
+        // aqui mapeamos o array de usertsDB (resultado na nossa busca)
+        // para cada item do array usersDB instanciamos um ojbeto User (new User(propriedades))
+        // passando o valor do item do banco de dados como propriedade do novo objeto
+        // assim, 
+        // 
+        // new User (
+        //     id: usersDB.id
+        //     ... cada propriedade do objeto recebe o mesmo valor do DB ... 
+        // )
+        // por fim, enviamos uma lista de instancias 'users' para o postman;
+
+        const users: User[] = usersDB.map((userDB)=>
+            new User(
+                userDB.id,
+                userDB.name,
+                userDB.email,
+                userDB.password,
+                userDB.created_at
+            ))
+
+
+        res.status(200).send(users)
     } catch (error) {
         console.log(error)
 
@@ -59,6 +95,7 @@ app.get("/users", async (req: Request, res: Response) => {
         }
     }
 })
+
 
 app.post("/users", async (req: Request, res: Response) => {
     try {
@@ -90,18 +127,33 @@ app.post("/users", async (req: Request, res: Response) => {
             res.status(400)
             throw new Error("'id' já existe")
         }
+// Refatore o endpoint POST /users
+// agora a API será responsável por criar 
+// as datas para facilitar o instanciamento de User
 
-        const newUser: TUserDBPost = {
+// a resposta deve ser uma instância de User
+
+        const newUser = new User ( 
             id,
             name,
             email,
-            password
+            password,
+            new Date().toISOString()
+            ) 
+        
+        const newUserDB: TUserDB ={
+
+            id: newUser.getId(),
+            name: newUser.getName(),
+            email: newUser.getEmail(),
+            password: newUser.getPassword(),
+            created_at: newUser.getCreatedAt()
         }
 
-        await db("users").insert(newUser)
+        await db("users").insert(newUserDB)
         const [ userDB ]: TUserDB[] = await db("users").where({ id })
 
-        res.status(201).send(userDB)
+        res.status(201).send(newUser)
     } catch (error) {
         console.log(error)
 
@@ -116,12 +168,26 @@ app.post("/users", async (req: Request, res: Response) => {
         }
     }
 })
+// Implementar uma instância é garantir que a
+// regra de negócio está sendo aplicada
+
+//Crie e exporte a classe Account de src/models/Account.ts
+
+//Refatore os endpoints relacionados a 
+///accounts para utilizarem instâncias da classe Account
 
 app.get("/accounts", async (req: Request, res: Response) => {
     try {
         const accountsDB: TAccountDB[] = await db("accounts")
 
-        res.status(200).send(accountsDB)
+        const accounts :Account[] = accountsDB.map((account)=> new Account(
+                account.id,
+                account.balance,
+                account.owner_id,
+                account.created_at,              
+        ))
+
+        res.status(200).send( accounts)
     } catch (error) {
         console.log(error)
 
@@ -147,8 +213,13 @@ app.get("/accounts/:id/balance", async (req: Request, res: Response) => {
             res.status(404)
             throw new Error("'id' não encontrado")
         }
+       const account = new Account(
+            accountDB.id,
+            accountDB.balance,
+            accountDB.owner_id,
+            accountDB.created_at)
 
-        res.status(200).send({ balance: accountDB.balance })
+        res.status(200).send({ balance: account.getBalance() })
     } catch (error) {
         console.log(error)
 
@@ -186,15 +257,26 @@ app.post("/accounts", async (req: Request, res: Response) => {
             throw new Error("'id' já existe")
         }
 
-        const newAccount: TAccountDBPost = {
+        const newAccount = new Account(
             id,
-            owner_id: ownerId
-        }
+            0,
+            ownerId,
+            new Date().toISOString()
+            )
+        
+           
+            const newAccountDB: TAccountDB ={
 
-        await db("accounts").insert(newAccount)
+                id: newAccount.getId(),
+                balance: newAccount.getBalance(),
+                owner_id: newAccount.getOwnerId(),
+                created_at: newAccount.getCreatedAt()
+            }
+
+        await db("accounts").insert(newAccountDB)
         const [ accountDB ]: TAccountDB[] = await db("accounts").where({ id })
 
-        res.status(201).send(accountDB)
+        res.status(201).send(newAccount)
     } catch (error) {
         console.log(error)
 
@@ -227,9 +309,17 @@ app.put("/accounts/:id/balance", async (req: Request, res: Response) => {
             throw new Error("'id' não encontrado")
         }
 
-        accountDB.balance += value
+        const accoutToEdit = new Account(
+            accountDB.id,
+            accountDB.balance += value ,
+            accountDB.owner_id,
+            accountDB.created_at
+            )
+            console.log(accoutToEdit)
 
-        await db("accounts").update({ balance: accountDB.balance }).where({ id })
+        
+
+        await db("accounts").update({ balance: accoutToEdit.getBalance() }).where({ id })
         
         res.status(200).send(accountDB)
     } catch (error) {
